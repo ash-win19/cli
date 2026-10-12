@@ -7,6 +7,7 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
+/** Answer the next request with this exact status, body and headers. */
 function stubFetch(status: number, body: string, headers: Record<string, string> = {}) {
   globalThis.fetch = (async () =>
     new Response(body, { status, headers })) as unknown as typeof fetch;
@@ -22,6 +23,9 @@ async function caught(p: Promise<unknown>): Promise<MonidError> {
 }
 
 const api = new MonidAPI({ baseUrl: 'https://api.test', apiKey: 'monid_test_x' });
+
+/** The bare `<html>` + CRLF error page a gateway returns — not the API. */
+const GATEWAY_HTML = '<html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>...</body>\r\n</html>';
 
 describe('MonidAPI error parsing', () => {
   it('parses our RATE_LIMITED 429: Retry-After and the run label', async () => {
@@ -69,22 +73,107 @@ describe('MonidAPI error parsing', () => {
     expect((await caught(api.discover('x'))).code).toBe('FORBIDDEN');
   });
 
-  it('a COMPLETED run body on a non-2xx marks the status as the provider\'s', async () => {
-    stubFetch(429, JSON.stringify({ runId: '01RUN', status: 'COMPLETED', providerResponse: { httpStatus: 429 } }));
+  it('a Monid 401 envelope (bad key) is not a provider run', async () => {
+    stubFetch(401, '{"code":401,"message":"Invalid API key"}');
     const err = await caught(api.run('tinyfish', '/search'));
-    expect(err.code).toBe('RATE_LIMITED');
-    expect(err.providerRun).toEqual({ runId: '01RUN', httpStatus: 429 });
+    expect(err.code).toBe('AUTH_FAILED');
+    expect(err.message).toBe('Invalid API key');
+    expect(err.providerRun).toBeUndefined();
+  });
+
+  it('a COMPLETED run body on a non-2xx marks the status as the provider\'s', async () => {
+    stubFetch(401, JSON.stringify({ runId: '01RUN', status: 'COMPLETED', providerResponse: { httpStatus: 401 } }));
+    const err = await caught(api.run('tinyfish', '/search'));
+    expect(err.providerRun).toEqual({ runId: '01RUN', status: 'COMPLETED', httpStatus: 401 });
   });
 
   it('a provider 402 surfaced as 502 reports the provider\'s own status', async () => {
     stubFetch(502, JSON.stringify({ runId: '01RUN', status: 'COMPLETED', providerResponse: { httpStatus: 402 } }));
-    expect((await caught(api.run('tinyfish', '/search'))).providerRun).toEqual({ runId: '01RUN', httpStatus: 402 });
+    expect((await caught(api.run('tinyfish', '/search'))).providerRun).toEqual({
+      runId: '01RUN',
+      status: 'COMPLETED',
+      httpStatus: 402,
+    });
   });
 
-  it('a TIMED_OUT 408 run body is not treated as a provider status', async () => {
+  it('a TIMED_OUT 408 run body keeps the run id', async () => {
     stubFetch(408, JSON.stringify({ runId: '01RUN', status: 'TIMED_OUT' }));
     const err = await caught(api.run('tinyfish', '/search'));
-    expect(err.providerRun).toBeUndefined();
-    expect(err.message).toBe('HTTP 408');
+    expect(err.providerRun).toEqual({ runId: '01RUN', status: 'TIMED_OUT', httpStatus: 408 });
+  });
+
+  it('a run body in another status is not treated as a provider run', async () => {
+    stubFetch(500, JSON.stringify({ runId: '01RUN', status: 'FAILED' }));
+    expect((await caught(api.run('tinyfish', '/search'))).providerRun).toBeUndefined();
+  });
+});
+
+describe('MonidAPI non-JSON responses', () => {
+  it('reports the HTTP status when a gateway answers 5xx with HTML', async () => {
+    // Regression: the body was parsed BEFORE the status was checked, so this
+    // surfaced as `Unexpected token '<', "<html>..." is not valid JSON` and
+    // the 502 was lost entirely.
+    stubFetch(502, GATEWAY_HTML, { 'content-type': 'text/html' });
+
+    const err = await caught(api.whoami());
+    expect(err).toBeInstanceOf(MonidError);
+    expect(err.statusCode).toBe(502);
+    expect(err.code).toBe('HTTP_502');
+    expect(err.message).toBe('HTTP 502');
+    expect(err.message).not.toContain('Unexpected token');
+  });
+
+  it('keeps the mapped code for a non-JSON 401', async () => {
+    stubFetch(401, GATEWAY_HTML, { 'content-type': 'text/html' });
+
+    const err = await caught(api.whoami());
+    expect(err.code).toBe('AUTH_FAILED');
+    expect(err.statusCode).toBe(401);
+  });
+
+  it('still prefers a structured API error message over the status', async () => {
+    stubFetch(
+      402,
+      JSON.stringify({ error: { code: 'INSUFFICIENT_BALANCE', message: 'Balance too low' } }),
+      { 'content-type': 'application/json' },
+    );
+
+    const err = await caught(api.whoami());
+    expect(err.code).toBe('INSUFFICIENT_BALANCE');
+    expect(err.message).toBe('Balance too low');
+  });
+
+  it('names a 2xx that is not JSON instead of throwing a parse error', async () => {
+    stubFetch(200, '<html>\r\n<body>captive portal</body>\r\n</html>', { 'content-type': 'text/html' });
+
+    const err = await caught(api.whoami());
+    expect(err).toBeInstanceOf(MonidError);
+    expect(err.code).toBe('INVALID_RESPONSE');
+    expect(err.message).toContain('Expected JSON');
+    expect(err.message).toContain('text/html');
+    expect(err.message).not.toContain('Unexpected token');
+  });
+
+  it('describes an empty 2xx body rather than reporting a parse error', async () => {
+    stubFetch(200, '', { 'content-type': 'application/json' });
+
+    const err = await caught(api.whoami());
+    expect(err.code).toBe('INVALID_RESPONSE');
+    expect(err.message).toContain('empty');
+  });
+
+  it('truncates a long non-JSON body in the error message', async () => {
+    stubFetch(200, 'x'.repeat(5000), { 'content-type': 'text/plain' });
+
+    const err = await caught(api.whoami());
+    expect(err.message).toContain('…');
+    expect(err.message.length).toBeLessThan(200);
+  });
+
+  it('returns the parsed payload on a normal 200', async () => {
+    stubFetch(200, JSON.stringify({ workspace: 'Test Workspace' }), { 'content-type': 'application/json' });
+
+    const out = await api.whoami() as unknown as { workspace: string };
+    expect(out.workspace).toBe('Test Workspace');
   });
 });

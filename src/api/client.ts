@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../config/constants.js';
-import { MonidError } from '../utils/error.js';
+import { MonidError, type ProviderRun } from '../utils/error.js';
 import type {
   BalanceResponse,
   DiscoverResponse,
@@ -80,16 +80,23 @@ export class MonidAPI {
       return undefined as T;
     }
 
+    // Not every response on this socket comes from the API. A gateway, proxy
+    // or load balancer in front of it answers 5xx with an HTML error page,
+    // and an unparsed body must not cost us the status: parsing FIRST turned
+    // a plain 502 into `Unexpected token '<', "<html>..." is not valid JSON`
+    // and threw the status away, so an upstream blip read as a broken CLI.
+    // Parse defensively and let the status drive the error instead.
+    const raw = await res.text();
+    let data: (T & ApiErrorResponse) | undefined;
+    let parsed = false;
+    try {
+      data = JSON.parse(raw) as T & ApiErrorResponse;
+      parsed = true;
+    } catch {
+      // Body is not JSON — handled below, by status first.
+    }
+
     if (!res.ok) {
-      // Parse defensively: an error body is not always JSON (e.g. the edge
-      // firewall's own 429), and a parse failure must not hide the status.
-      const text = await res.text();
-      let data: ApiErrorResponse | undefined;
-      try {
-        data = JSON.parse(text) as ApiErrorResponse;
-      } catch {
-        data = undefined;
-      }
       const message = data?.error?.message ?? data?.message ?? `HTTP ${res.status}`;
       const code = data?.error?.code ?? statusToCode(res.status);
       throw new MonidError(code, message, res.status, {
@@ -99,7 +106,17 @@ export class MonidAPI {
       });
     }
 
-    return await res.json() as T;
+    // 2xx that is not JSON is still a broken response — name it, and show
+    // enough of the body to tell a captive portal from a bad deploy.
+    if (!parsed) {
+      throw new MonidError(
+        'INVALID_RESPONSE',
+        `Expected JSON from ${url} but got ${describeBody(res, raw)}`,
+        res.status,
+      );
+    }
+
+    return data as T;
   }
 
   async discover(
@@ -238,25 +255,28 @@ function positiveInt(v: string | null): number | undefined {
 
 /**
  * A sync `POST /v1/run` returns the PROVIDER's HTTP status (401/403/429, or
- * 502 for a provider 402) with a COMPLETED run body, not Monid's
- * `{ code, message }` envelope. Return the run so the error is not
+ * 502 for a provider 402) with a COMPLETED run body, and 408 with a
+ * TIMED_OUT run body when the whole run exceeded its deadline. Neither is
+ * Monid's `{ code, message }` envelope. Return the run so the error is not
  * presented as Monid's own (expired key, workspace rate limit, ...). The
  * provider's real status is in `providerResponse.httpStatus`.
  */
 function providerRunOf(
   data: unknown,
   httpStatus: number,
-): { runId: string; httpStatus: number } | undefined {
+): ProviderRun | undefined {
   if (!data || typeof data !== 'object') return undefined;
   const { status, runId, providerResponse } = data as {
     status?: unknown;
     runId?: unknown;
     providerResponse?: { httpStatus?: unknown };
   };
-  if (status !== 'COMPLETED' || typeof runId !== 'string') return undefined;
+  if (typeof runId !== 'string') return undefined;
+  if (status !== 'COMPLETED' && status !== 'TIMED_OUT') return undefined;
   const providerStatus = providerResponse?.httpStatus;
   return {
     runId,
+    status,
     httpStatus: typeof providerStatus === 'number' ? providerStatus : httpStatus,
   };
 }
@@ -264,6 +284,21 @@ function providerRunOf(
 /** `GET /v1/runs/abc?x=1` → `GET /v1/runs/abc` */
 function defaultLabel(method: string, path: string): string {
   return `${method} ${path.split('?')[0]}`;
+}
+
+/**
+ * Describe a body that failed to parse as JSON, for an error message.
+ * Reports the declared content type and a short, whitespace-collapsed
+ * snippet — enough to identify an HTML error page or a captive portal
+ * without dumping a whole document into the terminal.
+ */
+function describeBody(res: Response, raw: string): string {
+  const type = res.headers.get('content-type')?.split(';')[0]?.trim();
+  const snippet = raw.trim().replace(/\s+/g, ' ').slice(0, 80);
+  if (!snippet) {
+    return type ? `an empty ${type} body` : 'an empty body';
+  }
+  return `${type ?? 'an unknown content type'}: ${snippet}${raw.trim().length > 80 ? '…' : ''}`;
 }
 
 function statusToCode(status: number): string {
