@@ -66,32 +66,73 @@ describe('handleError', () => {
     expect(exitCode).toBe(1);
   });
 
-  it('a Monid 401 still shows the expired-key message and the keys hint', () => {
-    run(new MonidError('AUTH_FAILED', 'Unauthorized', 401), false);
+  it('a Monid 401 shows the expired-key message, the dashboard link and the keys hint', () => {
+    run(new MonidError('AUTH_FAILED', 'Invalid API key', 401), false);
     expect(errOut[0]).toContain('API key is expired or invalid');
+    expect(errOut[0]).toContain('https://app.monid.ai/access/api-keys');
     expect(errOut.join('\n')).toContain('monid keys add');
+  });
+
+  it('a Monid 401 keeps AUTH_FAILED in --json', () => {
+    run(new MonidError('AUTH_FAILED', 'Invalid API key', 401), true);
+    const parsed = JSON.parse(out.join('\n'));
+    expect(parsed.error.code).toBe('AUTH_FAILED');
+    expect(parsed.error.runId).toBeUndefined();
+  });
+
+  it('a Monid 402 links the dashboard wallet, not the API host', () => {
+    run(new MonidError('INSUFFICIENT_BALANCE', 'Insufficient funds', 402), false);
+    expect(errOut[0]).toContain('https://app.monid.ai/wallet');
   });
 
   it('a provider 401 is not shown as a Monid key problem', () => {
     run(new MonidError('AUTH_FAILED', 'HTTP 401', 401, {
       limitedOn: 'tinyfish /search',
-      providerRun: { runId: '01RUN', httpStatus: 401 },
+      providerRun: { runId: '01RUN', status: 'COMPLETED', httpStatus: 401 },
     }), false);
     const all = errOut.join('\n');
     expect(all).toContain('tinyfish /search: the provider returned HTTP 401 (run 01RUN)');
+    expect(all).toContain('not a problem with your Monid API key');
     expect(all).not.toContain('API key is expired');
     expect(all).not.toContain('monid keys add');
     expect(exitCode).toBe(1);
   });
 
-  it('a provider 429 is not shown as a Monid rate limit; --json code unchanged', () => {
-    run(new MonidError('RATE_LIMITED', 'HTTP 429', 429, {
+  it('a provider 401 in --json is PROVIDER_ERROR with the run id and provider status', () => {
+    run(new MonidError('AUTH_FAILED', 'HTTP 401', 401, {
       limitedOn: 'tinyfish /search',
-      providerRun: { runId: '01RUN', httpStatus: 429 },
+      providerRun: { runId: '01RUN', status: 'COMPLETED', httpStatus: 401 },
     }), true);
     const parsed = JSON.parse(out.join('\n'));
-    expect(parsed.error.code).toBe('RATE_LIMITED');
+    expect(parsed.error.code).toBe('PROVIDER_ERROR');
+    expect(parsed.error.runId).toBe('01RUN');
+    expect(parsed.error.providerHttpStatus).toBe(401);
+    expect(parsed.error.message).not.toContain('API key is expired');
+    expect(exitCode).toBe(1);
+  });
+
+  it('a provider 429 is not shown as a Monid rate limit', () => {
+    run(new MonidError('RATE_LIMITED', 'HTTP 429', 429, {
+      limitedOn: 'tinyfish /search',
+      providerRun: { runId: '01RUN', status: 'COMPLETED', httpStatus: 429 },
+    }), true);
+    const parsed = JSON.parse(out.join('\n'));
+    expect(parsed.error.code).toBe('PROVIDER_ERROR');
     expect(parsed.error.message).not.toContain('Rate limited on');
     expect(parsed.error.message).toContain('the provider returned HTTP 429');
+  });
+
+  it('a timed-out run (408) names the run, not a provider status', () => {
+    const err = new MonidError('HTTP_408', 'HTTP 408', 408, {
+      limitedOn: 'tinyfish /search',
+      providerRun: { runId: '01RUN', status: 'TIMED_OUT', httpStatus: 408 },
+    });
+    run(err, false);
+    expect(errOut[0]).toContain('Run 01RUN timed out. Details: monid runs get -r 01RUN');
+    run(err, true);
+    const parsed = JSON.parse(out.join('\n'));
+    expect(parsed.error.code).toBe('RUN_TIMED_OUT');
+    expect(parsed.error.runId).toBe('01RUN');
+    expect(parsed.error.providerHttpStatus).toBeUndefined();
   });
 });

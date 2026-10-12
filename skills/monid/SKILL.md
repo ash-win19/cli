@@ -411,7 +411,9 @@ When a run is `BLOCKED`, the response includes a `controls` array of the snapsho
 
 **Rate limited** (`monid: error: Rate limited on <what>. Retry after Ns.`; with `--json`, `error.code` is `RATE_LIMITED`) — the workspace hit a Monid request limit. Nothing was run or charged. Wait N seconds, then retry the same command. Space out bursts of calls rather than retrying immediately.
 
-**"the provider returned HTTP …"** — the provider answered the run with an error status (for example its own 401 or rate limit). This is not a problem with your Monid key or workspace limits. Check the run with `monid runs get -r <runId>`.
+**"the provider returned HTTP …"** (with `--json`, `error.code` is `PROVIDER_ERROR`, plus `runId` and `providerHttpStatus`) — the provider answered the run with an error status (for example its own 401 or rate limit). Your Monid key and workspace limits are fine; do not rotate the key. Check the run with `monid runs get -r <runId>`.
+
+**"Run … timed out"** (with `--json`, `error.code` is `RUN_TIMED_OUT`, plus `runId`) — the whole run exceeded its time limit. It was not charged. Check it with `monid runs get -r <runId>` and retry if needed.
 
 **Run taking a long time** — Normal for some endpoints. Runs can take up to 120 seconds. Keep polling or let `--wait` handle it.
 
