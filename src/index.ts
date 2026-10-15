@@ -9,6 +9,7 @@ import { runsCommand } from './commands/runs/index.js';
 import { resourcesCommand } from './commands/resources/index.js';
 import { whoamiCommand } from './commands/whoami.js';
 import { setupCommand } from './commands/setup.js';
+import { generateSessionIdCommand } from './commands/generate-session-id.js';
 
 const cli = new Command()
   .name('monid')
@@ -27,6 +28,7 @@ const cli = new Command()
   .command('whoami', whoamiCommand)
   .command('setup', setupCommand)
   .command('balance', balanceCommand)
-  .command('keys', keysCommand);
+  .command('keys', keysCommand)
+  .command('generate_session_id', generateSessionIdCommand);
 
 await cli.parse();
