@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'bun:test';
 import { MonidAPI } from '../../src/api/client.js';
 import { MonidError } from '../../src/utils/error.js';
+import { VERSION } from '../../src/config/constants.js';
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -88,5 +89,18 @@ describe('MonidAPI request error handling', () => {
 
     const out = await api.whoami() as unknown as { workspace: string };
     expect(out.workspace).toBe('Test Workspace');
+  });
+});
+
+describe('MonidAPI request headers', () => {
+  it('identifies itself as cli@<version>', async () => {
+    let sent: Headers | undefined;
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      sent = new Headers(init?.headers);
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+
+    await api.whoami();
+    expect(sent?.get('X-Monid-Client')).toBe(`cli@${VERSION}`);
   });
 });

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../config/constants.js';
+import { API_BASE_URL, VERSION } from '../config/constants.js';
 import { MonidError } from '../utils/error.js';
 import type {
   BalanceResponse,
@@ -65,7 +65,7 @@ export class MonidAPI {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
       'Content-Type': 'application/json',
-      'X-Monid-Client': 'cli',
+      'X-Monid-Client': `cli@${VERSION}`,
     };
 
     const res = await fetch(url, {
