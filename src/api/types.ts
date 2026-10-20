@@ -543,6 +543,13 @@ export interface ResourceReleaseResponse {
   usage?: Usage;
 }
 
+// --- Feedback ---
+
+export interface FeedbackResponse {
+  feedbackId: string;
+  createdAt: string;
+}
+
 // --- Public Telemetry ---
 
 export interface SetupTelemetryRequest {

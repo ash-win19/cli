@@ -10,6 +10,7 @@ import { resourcesCommand } from './commands/resources/index.js';
 import { whoamiCommand } from './commands/whoami.js';
 import { setupCommand } from './commands/setup.js';
 import { generateSessionIdCommand } from './commands/generate-session-id.js';
+import { feedbackCommand } from './commands/feedback.js';
 
 const cli = new Command()
   .name('monid')
@@ -29,6 +30,7 @@ const cli = new Command()
   .command('setup', setupCommand)
   .command('balance', balanceCommand)
   .command('keys', keysCommand)
-  .command('generate_session_id', generateSessionIdCommand);
+  .command('generate_session_id', generateSessionIdCommand)
+  .command('feedback', feedbackCommand);
 
 await cli.parse();

@@ -4,6 +4,7 @@ import type {
   BalanceResponse,
   DiscoverResponse,
   ExternalResourceDetail,
+  FeedbackResponse,
   InspectResponse,
   Resource,
   ResourceEventsResponse,
@@ -175,6 +176,14 @@ export class MonidAPI {
     if (cursor) params.set('cursor', cursor);
     const qs = params.toString();
     return this.request('GET', `/v1/runs${qs ? `?${qs}` : ''}`);
+  }
+
+  // --- Feedback ---
+
+  async sendFeedback(text: string, runId?: string): Promise<FeedbackResponse> {
+    const body: Record<string, unknown> = { text };
+    if (runId) body.runId = runId;
+    return this.request('POST', '/v1/feedback', body);
   }
 
   // --- Auth ---
