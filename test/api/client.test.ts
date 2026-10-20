@@ -146,3 +146,27 @@ describe('MonidAPI sendFeedback', () => {
     expect((err as MonidError).message).toBe('Run 01X not found');
   });
 });
+
+describe('MonidAPI sendDispute', () => {
+  it('POSTs the body to /v1/dispute and returns the stored id', async () => {
+    let sent: { url?: string; method?: string; body?: unknown } = {};
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      sent = { url, method: init?.method, body: JSON.parse(String(init?.body)) };
+      return new Response(
+        JSON.stringify({ disputeId: 'dp-1', createdAt: '2026-10-20T00:00:00.000Z' }),
+        { status: 201, headers: { 'content-type': 'application/json' } },
+      );
+    }) as typeof fetch;
+
+    const body = {
+      runIds: ['run-a'],
+      reason: 'stale',
+      context: { userQuery: 'latest posts', runIds: ['run-a'] },
+    };
+    const out = await api.sendDispute(body);
+    expect(sent.method).toBe('POST');
+    expect(sent.url).toBe('https://api.example.test/v1/dispute');
+    expect(sent.body).toEqual(body);
+    expect(out.disputeId).toBe('dp-1');
+  });
+});
