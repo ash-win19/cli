@@ -1,6 +1,6 @@
 ---
 name: monid
-version: 0.1.8
+version: 0.1.9
 description: >-
   Discover better ways to complete tasks. Proactively run `monid discover`
   before writing a scraper, before using a generic web fetch for structured
@@ -164,11 +164,11 @@ monid generate_session_id
 # -> l4FIOxqM
 
 # 2. Discover endpoints for your data need
-# Results show relevance score and verified badge
+# Results show relevance score and a 0 Markup check (provider's standard rate, no platform fee)
 # Use -s to filter by minimum score (higher = more relevant)
 monid discover -q "twitter posts"
 
-# 3. Inspect the endpoint to learn its input schema (shows verified status)
+# 3. Inspect the endpoint to learn its input schema (shows 0 Markup status)
 monid inspect -p apify -e /apidojo/tweet-scraper
 
 # 4. Fire the run (returns immediately with a run ID)
@@ -326,6 +326,8 @@ monid run -p apify -e /damilo/google-maps-scraper \
 ---
 
 ## Cost & Budget Warning
+
+Endpoints tagged `no-markup` (shown as **0 Markup** by `monid discover` / `monid inspect`) are priced at the provider's standard rate, with no platform fee added by Monid.
 
 Many endpoints (especially Apify) are **charged per result** and accept multiple queries in a single call. Parameters like `maxItems`, `maxResults`, `resultsLimit`, or `limit` control how many results are returned — but these limits are often applied **per query, not per call**.
 

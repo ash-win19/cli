@@ -31,6 +31,12 @@ import type { CredentialKey } from '../config/types.js';
 
 // --- Discover ---
 
+/**
+ * Endpoint tag meaning "priced at the provider's standard rate, no platform
+ * fee added" — shown as "0 Markup" (monid.ai Terms of Service define it).
+ */
+export const NO_MARKUP_TAG = 'no-markup';
+
 export function formatDiscoverResults(data: DiscoverResponse): void {
   if (data.results.length === 0) {
     console.log(chalk.gray('No results found.'));
@@ -43,7 +49,7 @@ export function formatDiscoverResults(data: DiscoverResponse): void {
   // gap between them. `Health` matches the section name `inspect` prints, so
   // the same concept reads under the same word on both surfaces.
   //
-  // It sits at the end next to `Verified`: both are narrow and often empty,
+  // It sits at the end next to `0 Markup`: both are narrow and often empty,
   // so grouping them confines the ragged whitespace to one edge instead of
   // punching a hole through the middle of the table.
   const headers = [
@@ -52,7 +58,7 @@ export function formatDiscoverResults(data: DiscoverResponse): void {
     'Price',
     'Description',
     'Health',
-    'Verified',
+    '0 Markup',
   ];
   const rows = data.results.map((r) => [
     r.provider,
@@ -60,10 +66,13 @@ export function formatDiscoverResults(data: DiscoverResponse): void {
     formatPriceCompact(r.price),
     truncate(r.description, 50),
     formatHealthCell(r.metrics),
-    hasTag(r.tags, 'verified') ? chalk.green('✓') : '',
+    // `no-markup`: priced at the provider's standard rate, no platform fee.
+    // Replaces the old Verified column (the `verified` tag is no longer
+    // surfaced, matching monid.ai and the web app).
+    hasTag(r.tags, NO_MARKUP_TAG) ? chalk.green('✓') : '',
   ]);
 
-  // Index 5 = Verified. It shifts whenever a column is added before it.
+  // Index 5 = 0 Markup. It shifts whenever a column is added before it.
   renderTable(headers, rows, { columns: { 5: { align: 'center' } } });
 
   formatHints(data.hints ?? data.usage);
@@ -85,9 +94,11 @@ export function formatInspectResult(data: InspectResponse): void {
   console.log(chalk.bold('Description'));
   console.log(`  ${data.description}`);
 
-  if (hasTag(data.tags, 'verified')) {
+  if (hasTag(data.tags, NO_MARKUP_TAG)) {
     console.log();
-    console.log(chalk.dim('✓ Verified'));
+    console.log(
+      `${chalk.green('0 Markup')} ${chalk.dim("(provider's standard rate, no platform fee)")}`,
+    );
   }
 
   if (data.summary) {
