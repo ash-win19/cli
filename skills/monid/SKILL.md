@@ -135,6 +135,7 @@ Each command supports `--help` for full usage. Here's what's available:
 | `monid runs get` | Get run status and results (`-r <runId>`, `-w` to wait) |
 | `monid runs stop` | Stop an in-progress run (`-r <runId>`). Not all runs can be stopped |
 | `monid balance` | Show current workspace balance |
+| `monid feedback` | Send feedback about Monid (`-t <text>`, `-r <runId>` to attach it to a run) |
 | `monid setup` | Complete CLI setup after installation (no API key required) |
 | `monid keys add` | Add an API key (`-k <key> -l <label>`) |
 | `monid keys list` | Show configured keys |
@@ -399,6 +400,39 @@ When a run is `BLOCKED`, the response includes a `controls` array of the snapsho
 
 ---
 
+## Feedback
+
+`monid feedback` sends free-text feedback straight to the Monid team. Use it to report problems and gaps so they get fixed:
+
+```bash
+# General feedback
+monid feedback -t "discover returns no endpoints for 'glassdoor reviews'"
+
+# Feedback about a specific run — attach the run ID
+monid feedback -r 01HXYZ... \
+  -t "Run COMPLETED but the output is empty for a valid profile URL"
+# -> Feedback sent (ID: ...). Thank you!
+```
+
+**When to send feedback:**
+
+- **The user asks you to** — e.g. "tell Monid this endpoint is broken." Pass along what they said, in their words.
+- **An endpoint misbehaves** — a run `FAILED` or `TIMED_OUT` with valid input, returned empty or wrong data, or doesn't match its `inspect` schema. Pass `-r <runId>` so the team can see the run.
+- **The catalog has a gap** — `discover` had nothing that fit the task, and you had to fall back to something else.
+- **The CLI or docs got in the way** — a confusing error, a misleading hint, or an instruction in this skill that turned out wrong.
+
+**How to write it:**
+
+- One issue per message, sent once. Don't repeat it for every retry.
+- Be specific: the endpoint (`-p`/`-e`), what you expected, what happened, and the error text if there was one.
+- **Never include secrets or private data** — no API keys, credentials, or personal information from the user's task. Describe the input's shape instead of pasting it.
+- Text is trimmed and must be 1–4000 characters.
+- Feedback is not a support channel. Nothing comes back beyond the feedback ID, so keep helping the user with the task.
+
+If the response is **"Feedback is not available for this workspace yet."**, feedback isn't enabled for this workspace — skip it and carry on. A **"Run ... not found"** error means the `-r` run ID is wrong; check it with `monid runs list`.
+
+---
+
 ## Troubleshooting
 
 **"No active API key"** — No key configured. Run `monid keys add -k <key> -l main`.
@@ -408,6 +442,8 @@ When a run is `BLOCKED`, the response includes a `controls` array of the snapsho
 **Run status FAILED** — Check error details with `monid runs get -r <runId>`. Common causes: invalid input parameters (re-inspect the endpoint), rate limits (retry later), or request scope too large (reduce item count).
 
 **Run status BLOCKED** — A workspace control stopped the run before it executed (e.g. a budget cap or run cap). Inspect the `controls` array in `monid runs get -r <runId>` to see which control triggered. Retrying as-is will block again until the control is changed — let the user know they can pause or adjust the control on the dashboard (https://app.monid.ai), or wait for a budget window to reset.
+
+**"Feedback is not available for this workspace yet."** — `monid feedback` isn't enabled for this workspace. Don't retry; continue without it.
 
 **Run taking a long time** — Normal for some endpoints. Runs can take up to 120 seconds. Keep polling or let `--wait` handle it.
 
@@ -427,3 +463,4 @@ When a run is `BLOCKED`, the response includes a `controls` array of the snapsho
 10. **Check the Hints block** — when a command's output includes a `Hints` section, read it and act on it. It carries suggested next steps, endpoint relationships, and caveats from the server — prefer its suggestions over guessing your next command.
 11. **Use health to break ties, never to filter** — prefer the healthier of two endpoints that both fit (`healthy` and `stable` are both good; avoid `degraded`). Never skip an endpoint over an `unknown` status or a missing run time; both usually just mean low traffic. See [Endpoint Health](#endpoint-health).
 12. **Surface BLOCKED runs to the user** — a `BLOCKED` status means a workspace control (budget or run cap) stopped the run; it is terminal and will not self-resolve. Report which control blocked it (from the `controls` list) and tell the user they can pause or modify that control on the dashboard (https://app.monid.ai) before retrying.
+13. **Report problems with `monid feedback`** — when the user asks, or when an endpoint fails or misbehaves on valid input, `discover` has no fit for the task, or the CLI gets in the way. Attach `-r <runId>` when it's about a run, send each issue once, and never include secrets or the user's private data. See [Feedback](#feedback).
