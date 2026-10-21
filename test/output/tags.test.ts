@@ -34,11 +34,14 @@ const price = {
   amount: { value: 0.0645, currency: 'USD' },
 } as unknown as Price;
 
-describe('0 Markup (no-markup tag)', () => {
-  it('discover: the 0 Markup column replaces Verified', () => {
+// Endpoint tags (`verified`, `no-markup`, …) are API data for agents: they
+// stay in `--json` output (the raw response), but the human-readable tables
+// do not render them.
+describe('endpoint tags are not rendered in human output', () => {
+  it('discover: no Verified column, no tag text', () => {
     const data: DiscoverResponse = {
       query: 'backlinks',
-      count: 2,
+      count: 1,
       results: [
         {
           provider: 'ahrefs',
@@ -49,28 +52,16 @@ describe('0 Markup (no-markup tag)', () => {
           score: 0.9,
           tags: ['verified', 'no-markup'],
         },
-        {
-          provider: 'fundable',
-          providerName: 'Fundable',
-          endpoint: '/deals',
-          description: 'Deals',
-          price,
-          score: 0.5,
-          tags: ['verified'],
-        },
       ],
     };
     const out = capture(() => formatDiscoverResults(data));
-    expect(out).toContain('0 Markup');
+    expect(out).toContain('/site-explorer/all-backlinks');
     expect(out).not.toContain('Verified');
-    const ahrefs = out.split('\n').find((l) => l.includes('/site-explorer'));
-    const fundable = out.split('\n').find((l) => l.includes('/deals'));
-    expect(ahrefs).toContain('✓');
-    expect(fundable).not.toContain('✓');
+    expect(out).not.toMatch(/markup/i);
   });
 
-  it('inspect: prints 0 Markup only for tagged endpoints, never Verified', () => {
-    const base: InspectResponse = {
+  it('inspect: no Verified line, no tag text', () => {
+    const data: InspectResponse = {
       id: 'x',
       provider: 'ahrefs',
       providerName: 'Ahrefs',
@@ -79,14 +70,9 @@ describe('0 Markup (no-markup tag)', () => {
       price,
       tags: ['verified', 'no-markup'],
     };
-    const tagged = capture(() => formatInspectResult(base));
-    expect(tagged).toContain("0 Markup (provider's standard rate, no platform fee)");
-    expect(tagged).not.toContain('Verified');
-
-    const untagged = capture(() =>
-      formatInspectResult({ ...base, tags: ['verified'] }),
-    );
-    expect(untagged).not.toContain('0 Markup');
-    expect(untagged).not.toContain('Verified');
+    const out = capture(() => formatInspectResult(data));
+    expect(out).toContain('Backlinks');
+    expect(out).not.toContain('Verified');
+    expect(out).not.toMatch(/markup/i);
   });
 });

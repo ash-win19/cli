@@ -31,12 +31,6 @@ import type { CredentialKey } from '../config/types.js';
 
 // --- Discover ---
 
-/**
- * Endpoint tag meaning "priced at the provider's standard rate, no platform
- * fee added" — shown as "0 Markup" (monid.ai Terms of Service define it).
- */
-export const NO_MARKUP_TAG = 'no-markup';
-
 export function formatDiscoverResults(data: DiscoverResponse): void {
   if (data.results.length === 0) {
     console.log(chalk.gray('No results found.'));
@@ -49,16 +43,15 @@ export function formatDiscoverResults(data: DiscoverResponse): void {
   // gap between them. `Health` matches the section name `inspect` prints, so
   // the same concept reads under the same word on both surfaces.
   //
-  // It sits at the end next to `0 Markup`: both are narrow and often empty,
-  // so grouping them confines the ragged whitespace to one edge instead of
-  // punching a hole through the middle of the table.
+  // It sits at the end: it is narrow and often empty, so the ragged
+  // whitespace stays on one edge instead of punching a hole through the
+  // middle of the table.
   const headers = [
     'Provider',
     'Endpoint',
     'Price',
     'Description',
     'Health',
-    '0 Markup',
   ];
   const rows = data.results.map((r) => [
     r.provider,
@@ -66,14 +59,9 @@ export function formatDiscoverResults(data: DiscoverResponse): void {
     formatPriceCompact(r.price),
     truncate(r.description, 50),
     formatHealthCell(r.metrics),
-    // `no-markup`: priced at the provider's standard rate, no platform fee.
-    // Replaces the old Verified column (the `verified` tag is no longer
-    // surfaced, matching monid.ai and the web app).
-    hasTag(r.tags, NO_MARKUP_TAG) ? chalk.green('✓') : '',
   ]);
 
-  // Index 5 = 0 Markup. It shifts whenever a column is added before it.
-  renderTable(headers, rows, { columns: { 5: { align: 'center' } } });
+  renderTable(headers, rows);
 
   formatHints(data.hints ?? data.usage);
 }
@@ -93,13 +81,6 @@ export function formatInspectResult(data: InspectResponse): void {
   console.log();
   console.log(chalk.bold('Description'));
   console.log(`  ${data.description}`);
-
-  if (hasTag(data.tags, NO_MARKUP_TAG)) {
-    console.log();
-    console.log(
-      `${chalk.green('0 Markup')} ${chalk.dim("(provider's standard rate, no platform fee)")}`,
-    );
-  }
 
   if (data.summary) {
     console.log();
@@ -694,12 +675,6 @@ function formatRunError(error: RunError | string | undefined): string | undefine
   if (!error.source && !error.message) return undefined;
   const message = error.message ?? 'No details provided.';
   return error.source ? `(${error.source}) ${message}` : message;
-}
-
-function hasTag(tags: string[] | undefined, tag: string): boolean {
-  if (!tags) return false;
-  const lower = tag.toLowerCase();
-  return tags.some((t) => t.toLowerCase() === lower);
 }
 
 function formatHttpStatus(status: number | undefined): string {
