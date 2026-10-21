@@ -164,11 +164,10 @@ monid generate_session_id
 # -> l4FIOxqM
 
 # 2. Discover endpoints for your data need
-# Results show relevance score and verified badge
 # Use -s to filter by minimum score (higher = more relevant)
 monid discover -q "twitter posts"
 
-# 3. Inspect the endpoint to learn its input schema (shows verified status)
+# 3. Inspect the endpoint to learn its input schema
 monid inspect -p apify -e /apidojo/tweet-scraper
 
 # 4. Fire the run (returns immediately with a run ID)

@@ -43,16 +43,15 @@ export function formatDiscoverResults(data: DiscoverResponse): void {
   // gap between them. `Health` matches the section name `inspect` prints, so
   // the same concept reads under the same word on both surfaces.
   //
-  // It sits at the end next to `Verified`: both are narrow and often empty,
-  // so grouping them confines the ragged whitespace to one edge instead of
-  // punching a hole through the middle of the table.
+  // It sits at the end: it is narrow and often empty, so the ragged
+  // whitespace stays on one edge instead of punching a hole through the
+  // middle of the table.
   const headers = [
     'Provider',
     'Endpoint',
     'Price',
     'Description',
     'Health',
-    'Verified',
   ];
   const rows = data.results.map((r) => [
     r.provider,
@@ -60,11 +59,9 @@ export function formatDiscoverResults(data: DiscoverResponse): void {
     formatPriceCompact(r.price),
     truncate(r.description, 50),
     formatHealthCell(r.metrics),
-    hasTag(r.tags, 'verified') ? chalk.green('✓') : '',
   ]);
 
-  // Index 5 = Verified. It shifts whenever a column is added before it.
-  renderTable(headers, rows, { columns: { 5: { align: 'center' } } });
+  renderTable(headers, rows);
 
   formatHints(data.hints ?? data.usage);
 }
@@ -84,11 +81,6 @@ export function formatInspectResult(data: InspectResponse): void {
   console.log();
   console.log(chalk.bold('Description'));
   console.log(`  ${data.description}`);
-
-  if (hasTag(data.tags, 'verified')) {
-    console.log();
-    console.log(chalk.dim('✓ Verified'));
-  }
 
   if (data.summary) {
     console.log();
@@ -683,12 +675,6 @@ function formatRunError(error: RunError | string | undefined): string | undefine
   if (!error.source && !error.message) return undefined;
   const message = error.message ?? 'No details provided.';
   return error.source ? `(${error.source}) ${message}` : message;
-}
-
-function hasTag(tags: string[] | undefined, tag: string): boolean {
-  if (!tags) return false;
-  const lower = tag.toLowerCase();
-  return tags.some((t) => t.toLowerCase() === lower);
 }
 
 function formatHttpStatus(status: number | undefined): string {
