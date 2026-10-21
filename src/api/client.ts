@@ -3,6 +3,8 @@ import { MonidError } from '../utils/error.js';
 import type {
   BalanceResponse,
   DiscoverResponse,
+  DisputeRequest,
+  DisputeResponse,
   ExternalResourceDetail,
   FeedbackResponse,
   InspectResponse,
@@ -184,6 +186,12 @@ export class MonidAPI {
     const body: Record<string, unknown> = { text };
     if (runId) body.runId = runId;
     return this.request('POST', '/v1/feedback', body);
+  }
+
+  // --- Dispute ---
+
+  async sendDispute(input: DisputeRequest): Promise<DisputeResponse> {
+    return this.request('POST', '/v1/dispute', input);
   }
 
   // --- Auth ---
