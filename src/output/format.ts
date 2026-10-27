@@ -275,20 +275,19 @@ export function resolveOutput(data: RunDetailResponse): Record<string, unknown> 
   return data.providerResponse?.data ?? data.providerResponse?.error ?? data.output;
 }
 
-/** Writes a run's resolved output to `path`. Returns false when the run has no output yet. */
-export function writeRunOutput(data: RunDetailResponse, path: string, json?: boolean): boolean {
+/** Writes a run's resolved output to `path`. Writes nothing when the run has no output yet. */
+export function writeRunOutput(data: RunDetailResponse, path: string, json?: boolean): void {
   const output = resolveOutput(data);
   if (!output) {
     if (!json) {
       console.log(chalk.dim(`No output to write to ${path} (status: ${data.status}).`));
     }
-    return false;
+    return;
   }
   writeFileSync(path, JSON.stringify(output, null, 2));
   if (!json) {
     console.log(`Output written to ${path}`);
   }
-  return true;
 }
 
 export function formatRunDetail(data: RunDetailResponse): void {

@@ -8,7 +8,7 @@ import type { RunDetailResponse } from '../../src/api/types.js';
 const dir = mkdtempSync(join(tmpdir(), 'monid-run-output-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-function run(overrides: Partial<RunDetailResponse>): RunDetailResponse {
+function makeRun(overrides: Partial<RunDetailResponse>): RunDetailResponse {
   return {
     runId: 'run-a',
     caller: 'caller',
@@ -24,15 +24,13 @@ function run(overrides: Partial<RunDetailResponse>): RunDetailResponse {
 describe('writeRunOutput', () => {
   it('writes the resolved output as pretty JSON', () => {
     const path = join(dir, 'out.json');
-    const ok = writeRunOutput(run({ output: { items: [1, 2] } }), path, true);
-    expect(ok).toBe(true);
+    writeRunOutput(makeRun({ output: { items: [1, 2] } }), path, true);
     expect(JSON.parse(readFileSync(path, 'utf-8'))).toEqual({ items: [1, 2] });
   });
 
   it('writes nothing while the run has no output yet', () => {
     const path = join(dir, 'pending.json');
-    const ok = writeRunOutput(run({ status: 'RUNNING' }), path, true);
-    expect(ok).toBe(false);
+    writeRunOutput(makeRun({ status: 'RUNNING' }), path, true);
     expect(existsSync(path)).toBe(false);
   });
 });
