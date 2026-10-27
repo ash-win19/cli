@@ -1,12 +1,11 @@
 import { readFileSync } from 'node:fs';
-import { writeFileSync } from 'node:fs';
 import chalk from 'chalk';
 import { Command } from '@cliffy/command';
 import { MonidAPI } from '../api/client.js';
 import { ConfigManager } from '../config/manager.js';
 import { handleError, MonidError } from '../utils/error.js';
 import { printUpdateNotice, applyUpdateNote } from '../utils/update-check.js';
-import { formatRunDetail, resolveOutput, formatHints } from '../output/format.js';
+import { formatRunDetail, writeRunOutput, formatHints } from '../output/format.js';
 import {
   startSpinner,
   succeedSpinner,
@@ -167,15 +166,7 @@ export const runCommand = new Command()
       }
 
       // Write output to file if requested
-      if (output) {
-        const outputData = resolveOutput(result);
-        if (outputData) {
-          writeFileSync(output, JSON.stringify(outputData, null, 2));
-          if (!json) {
-            console.log(`Output written to ${output}`);
-          }
-        }
-      }
+      if (output) writeRunOutput(result, output, json);
 
       if (!json && updateInfo) printUpdateNotice(updateInfo);
     } catch (err) {
