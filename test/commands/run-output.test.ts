@@ -55,6 +55,8 @@ beforeEach(() => {
 
 afterEach(() => {
   stopSpinner();
+  // A failed JSON-mode write sets the exit code; keep it from failing the test run.
+  process.exitCode = 0;
   mock.restore();
   if (savedConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
   else process.env.XDG_CONFIG_HOME = savedConfigHome;
@@ -168,4 +170,32 @@ describe('run output before returning', () => {
     expect(JSON.parse(readFileSync(outputPath, 'utf-8'))).toEqual({ items: [6] });
     expect(JSON.parse(stdout()).status).toBe('COMPLETED');
   });
+});
+
+describe('JSON stdout when the file cannot be written', () => {
+  const data = { items: [7] };
+  const cases = [
+    { name: 'runs get', args: ['runs', 'get', '-r', 'run-a'], status: 'COMPLETED' as const },
+    { name: 'runs get --wait', args: ['runs', 'get', '-r', 'run-a', '-w'], status: 'COMPLETED' as const },
+    { name: 'run', args: ['run', '-p', 'apify', '-e', '/tweets'], status: 'COMPLETED' as const },
+    { name: 'run without --wait', args: ['run', '-p', 'apify', '-e', '/tweets'], status: 'RUNNING' as const },
+  ];
+
+  for (const { name, args, status } of cases) {
+    it(`keeps ${name} to one document with the run ID and the write error`, async () => {
+      const result = response({ status, providerResponse: { httpStatus: 200, data } });
+      run.mockResolvedValue(result);
+      getRun.mockResolvedValue(result);
+      const missingPath = join(dir, 'missing', 'out.json');
+
+      await cli.parse([...args, '-o', missingPath, '--json']);
+
+      const parsed = JSON.parse(stdout());
+      expect(parsed.runId).toBe('run-a');
+      expect(parsed.outputError.path).toBe(missingPath);
+      expect(parsed.outputError.message).toContain('ENOENT');
+      expect(process.exitCode).toBe(1);
+      expect(existsSync(missingPath)).toBe(false);
+    });
+  }
 });

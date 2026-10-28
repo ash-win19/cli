@@ -3,7 +3,7 @@ import { MonidAPI } from '../../api/client.js';
 import { ConfigManager } from '../../config/manager.js';
 import { handleError, MonidError } from '../../utils/error.js';
 import { printUpdateNotice, applyUpdateNote } from '../../utils/update-check.js';
-import { formatRunDetail, writeRunOutput } from '../../output/format.js';
+import { formatRunDetail, writeRunOutput, writeRunOutputJson } from '../../output/format.js';
 import {
   startSpinner,
   succeedSpinner,
@@ -61,7 +61,8 @@ export const runsGetCommand = new Command()
       const updateInfo = await config.getUpdateInfo();
 
       if (json) {
-        const out = updateInfo ? applyUpdateNote(result, updateInfo) : result;
+        const saved = output ? writeRunOutputJson(result, output) : result;
+        const out = updateInfo ? applyUpdateNote(saved, updateInfo) : saved;
         console.log(JSON.stringify(out, null, 2));
       } else {
         if (result.status === 'COMPLETED') {
@@ -80,8 +81,8 @@ export const runsGetCommand = new Command()
         formatRunDetail(result);
       }
 
-      // Write output to file if requested
-      if (output) writeRunOutput(result, output, json);
+      // Write output to file if requested (JSON mode wrote it above)
+      if (output && !json) writeRunOutput(result, output);
 
       if (!json && updateInfo) printUpdateNotice(updateInfo);
     } catch (err) {

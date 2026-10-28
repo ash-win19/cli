@@ -5,7 +5,7 @@ import { MonidAPI } from '../api/client.js';
 import { ConfigManager } from '../config/manager.js';
 import { handleError, MonidError } from '../utils/error.js';
 import { printUpdateNotice, applyUpdateNote } from '../utils/update-check.js';
-import { formatRunDetail, resolveOutput, writeRunOutput, formatHints } from '../output/format.js';
+import { formatRunDetail, resolveOutput, writeRunOutput, writeRunOutputJson, formatHints } from '../output/format.js';
 import {
   startSpinner,
   succeedSpinner,
@@ -103,8 +103,9 @@ export const runCommand = new Command()
         // Default: fire and return the run ID (only if not already complete)
         const updateInfo = await config.getUpdateInfo();
         if (json) {
-          const output = updateInfo ? applyUpdateNote(runRes, updateInfo) : runRes;
-          console.log(JSON.stringify(output, null, 2));
+          const saved = output ? writeRunOutputJson(runRes, output) : runRes;
+          const out = updateInfo ? applyUpdateNote(saved, updateInfo) : saved;
+          console.log(JSON.stringify(out, null, 2));
         } else {
           succeedSpinner(`Run started: ${runRes.runId}`);
           console.log(`Run ID: ${runRes.runId}`);
@@ -120,9 +121,9 @@ export const runCommand = new Command()
           formatHints(runRes.hints ?? runRes.usage);
           if (updateInfo) printUpdateNotice(updateInfo);
         }
-        if (output) {
-          writeRunOutput(runRes, output, json);
-          if (!json && !resolveOutput(runRes)) {
+        if (output && !json) {
+          writeRunOutput(runRes, output);
+          if (!resolveOutput(runRes)) {
             const runIdArg = `'${runRes.runId.replace(/'/g, "'\\''")}'`;
             const outputArg = `'${output.replace(/'/g, "'\\''")}'`;
             console.log(`Save the result later: monid runs get -r ${runIdArg} -w -o ${outputArg}`);
@@ -156,7 +157,8 @@ export const runCommand = new Command()
       const updateInfo = await config.getUpdateInfo();
 
       if (json) {
-        const out = updateInfo ? applyUpdateNote(result, updateInfo) : result;
+        const saved = output ? writeRunOutputJson(result, output) : result;
+        const out = updateInfo ? applyUpdateNote(saved, updateInfo) : saved;
         console.log(JSON.stringify(out, null, 2));
       } else {
         if (result.status === 'COMPLETED') {
@@ -173,8 +175,8 @@ export const runCommand = new Command()
         formatRunDetail(result);
       }
 
-      // Write output to file if requested
-      if (output) writeRunOutput(result, output, json);
+      // Write output to file if requested (JSON mode wrote it above)
+      if (output && !json) writeRunOutput(result, output);
 
       if (!json && updateInfo) printUpdateNotice(updateInfo);
     } catch (err) {
