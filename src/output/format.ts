@@ -271,12 +271,19 @@ function trimZero(n: number): string {
 
 // --- Run Detail ---
 
-export function resolveOutput(data: RunDetailResponse): Record<string, unknown> | undefined {
+/** Prefer provider data, then its error body, then stored run output. */
+export function resolveOutput(
+  data: Pick<RunDetailResponse, 'providerResponse' | 'output'>,
+): Record<string, unknown> | undefined {
   return data.providerResponse?.data ?? data.providerResponse?.error ?? data.output;
 }
 
-/** Writes a run's resolved output to `path`. Writes nothing when the run has no output yet. */
-export function writeRunOutput(data: RunDetailResponse, path: string, json?: boolean): void {
+/** Write resolved output as JSON, or explain its absence. Suppress notices in JSON mode. */
+export function writeRunOutput(
+  data: Pick<RunDetailResponse, 'providerResponse' | 'output' | 'status'>,
+  path: string,
+  json?: boolean,
+): void {
   const output = resolveOutput(data);
   if (!output) {
     if (!json) {

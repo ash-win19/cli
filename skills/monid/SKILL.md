@@ -407,7 +407,24 @@ When a run is `BLOCKED`, the response includes a `controls` array of the snapsho
 - **Be aware:** Runs can take 1-120 seconds. Using `--wait` without a timeout can block the conversation or hit agent runtime limits.
 
 **Saving output:**
-- Always use `-o <file>` to save results once the run completes (works with both approaches)
+- With `--wait`, save results in the same command:
+
+  ```bash
+  monid run -p <provider> -e <endpoint> -i '<input-json>' -w -o results.json
+  ```
+
+- With interactive polling, start the run, poll until it completes, then save its results:
+
+  ```bash
+  monid run -p <provider> -e <endpoint> -i '<input-json>'
+  monid runs get -r <runId>
+  # Once COMPLETED:
+  monid runs get -r <runId> -o results.json
+  ```
+
+  If blocking is acceptable, `monid runs get -r <runId> -w -o results.json` waits and saves in one command.
+
+`-o` writes output available during that command. If no output is available, the CLI leaves the file untouched and prints a notice in human-readable mode. An asynchronous `run -o` without `--wait` still returns immediately; it does not download results after exiting. `--json` suppresses file-saving notices so stdout stays valid JSON.
 
 ---
 

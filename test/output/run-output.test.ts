@@ -8,6 +8,7 @@ import type { RunDetailResponse } from '../../src/api/types.js';
 const dir = mkdtempSync(join(tmpdir(), 'monid-run-output-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
+/** Build a completed run fixture, with overrides for output and pending states. */
 function makeRun(overrides: Partial<RunDetailResponse>): RunDetailResponse {
   return {
     runId: 'run-a',

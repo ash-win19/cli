@@ -5,7 +5,7 @@ import { MonidAPI } from '../api/client.js';
 import { ConfigManager } from '../config/manager.js';
 import { handleError, MonidError } from '../utils/error.js';
 import { printUpdateNotice, applyUpdateNote } from '../utils/update-check.js';
-import { formatRunDetail, writeRunOutput, formatHints } from '../output/format.js';
+import { formatRunDetail, resolveOutput, writeRunOutput, formatHints } from '../output/format.js';
 import {
   startSpinner,
   succeedSpinner,
@@ -119,6 +119,14 @@ export const runCommand = new Command()
           }
           formatHints(runRes.hints ?? runRes.usage);
           if (updateInfo) printUpdateNotice(updateInfo);
+        }
+        if (output) {
+          writeRunOutput(runRes, output, json);
+          if (!json && !resolveOutput(runRes)) {
+            const runIdArg = `'${runRes.runId.replace(/'/g, "'\\''")}'`;
+            const outputArg = `'${output.replace(/'/g, "'\\''")}'`;
+            console.log(`Save the result later: monid runs get -r ${runIdArg} -w -o ${outputArg}`);
+          }
         }
         return;
       }
